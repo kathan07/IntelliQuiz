@@ -2,9 +2,12 @@ import errorHandler from "../utils/error.js";
 import Quiz from "../models/quiz.model.js";
 import Question from "../models/question.model.js";
 import Submission from "../models/submission.model.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Groq } from "groq-sdk";
+import dotenv from "dotenv";
+dotenv.config();
+// import nodemailer from "nodemailer";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+const groq = new Groq({ apiKey: process.env.API_KEY });
 
 const generateQuizQuestions = async (
   subject,
@@ -12,35 +15,52 @@ const generateQuizQuestions = async (
   totalQuestions,
   difficulty
 ) => {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const prompt = `Generate a quiz with ${totalQuestions} multiple-choice questions about ${subject} for grade ${grade} students. The difficulty level is ${difficulty}. For each question, provide the question text, 4 options, the correct answer, and a hint. Format the output as a JSON array. Make sure to keep key names as questionText for question, options for option, correctAnswer for correctAnswer and hint for hint. Dont give any questions that can't be parsed using JSON.parse function in javascript.`;
 
-  const prompt = `Generate a quiz with ${totalQuestions} multiple-choice questions about ${subject} for grade ${grade} students. The difficulty level is ${difficulty}. For each question, provide the question text, 4 options (A, B, C, D), the correct answer, and a hint. Format the output as a JSON array.`;
-
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
-
-  return JSON.parse(text);
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: "user", content: prompt }],
+    model: "mixtral-8x7b-32768",
+  });
+  //   console.log(completion.choices[0].message.content);
+  return JSON.parse(completion.choices[0].message.content);
 };
 
 const evaluateQuizAnswers = async (questions, userAnswers, maxScore) => {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   const questionsWithAnswers = questions.map((q, index) => ({
     question: q.text,
     correctAnswer: q.correctAnswer,
     userAnswer: userAnswers[index].selectedAnswer,
   }));
 
-  const prompt = `Evaluate the following quiz answers and provide a score out of ${maxScore}, along with feedback for each question and two suggestions to improve skills based on the responses. Format the output as JSON with keys: score, feedback (an array), and suggestionsToImprove (an array).
+  const prompt = `Evaluate the following quiz answers and provide a score out of ${maxScore}, along with feedback for each question and two suggestions to improve skills based on the responses. Format the output as JSON with keys: score (a number), feedback (an array of strings), and suggestionsToImprove (an array of strings). Ensure that feedback and suggestionsToImprove are arrays of strings and not objects.
   
     Quiz answers: ${JSON.stringify(questionsWithAnswers)}`;
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "mixtral-8x7b-32768",
+    });
 
-  return JSON.parse(text);
+    // console.log(completion.choices[0].message.content);
+
+    const parsedResponse = JSON.parse(completion.choices[0].message.content);
+
+    // Ensure feedback and suggestionsToImprove are arrays of strings
+    if (!Array.isArray(parsedResponse.feedback)) {
+      parsedResponse.feedback = [parsedResponse.feedback].filter(Boolean);
+    }
+    if (!Array.isArray(parsedResponse.suggestionsToImprove)) {
+      parsedResponse.suggestionsToImprove = [
+        parsedResponse.suggestionsToImprove,
+      ].filter(Boolean);
+    }
+
+    return parsedResponse;
+  } catch (error) {
+    console.error("Error evaluating quiz answers:", error);
+    throw new Error("Failed to evaluate quiz answers");
+  }
 };
 
 export const generateQuiz = async (req, res, next) => {
@@ -69,8 +89,8 @@ export const generateQuiz = async (req, res, next) => {
     const questionPromises = generatedQuestions.map(async (q) => {
       const question = new Question({
         quizId: quiz._id,
-        text: q.question,
-        options: [q.A, q.B, q.C, q.D],
+        text: q.questionText,
+        options: [q.options[0], q.options[1], q.options[2], q.options[3]],
         correctAnswer: q.correctAnswer,
         hint: q.hint,
       });
@@ -91,8 +111,8 @@ export const generateQuiz = async (req, res, next) => {
         maxScore: quiz.maxScore,
         difficulty: quiz.difficulty,
         questions: generatedQuestions.map((q) => ({
-          text: q.question,
-          options: [q.A, q.B, q.C, q.D],
+          text: q.questionText,
+          options: [q.options[0], q.options[1], q.options[2], q.options[3]],
         })),
       },
     });
@@ -107,16 +127,28 @@ export const submitQuizAnswers = async (req, res, next) => {
     const { quizId, userId, answers } = req.body;
 
     if (!quizId || !userId || !answers || !Array.isArray(answers)) {
-      next(errorHandler(400, "All fields are required"));
+      return next(errorHandler(400, "All fields are required"));
     }
 
-    const quiz = await Quiz.findById(quizId).populate("questions");
+    const quiz = await Quiz.findById(quizId);
     if (!quiz) {
-      next(errorHandler(404, "Quiz not found"));
+      return next(errorHandler(404, "Quiz not found"));
+    }
+
+    // Fetch all questions for this quiz
+    const questions = await Question.find({ _id: { $in: quiz.questions } });
+
+    if (questions.length !== answers.length) {
+      return next(
+        errorHandler(
+          400,
+          "Number of answers does not match number of questions"
+        )
+      );
     }
 
     const evaluation = await evaluateQuizAnswers(
-      quiz.questions,
+      questions,
       answers,
       quiz.maxScore
     );
@@ -124,7 +156,10 @@ export const submitQuizAnswers = async (req, res, next) => {
     const submission = new Submission({
       userId,
       quizId,
-      answers,
+      answers: answers.map((answer, index) => ({
+        questionIndex: index,
+        selectedAnswer: answer.selectedAnswer,
+      })),
       score: evaluation.score,
       feedback: evaluation.feedback,
       suggestionsToImprove: evaluation.suggestionsToImprove,
@@ -203,24 +238,39 @@ export const retryQuiz = async (req, res, next) => {
     const { userId, quizId, answers } = req.body;
 
     if (!userId || !quizId || !answers || !Array.isArray(answers)) {
-      next(errorHandler(400, "Invalid retry data"));
+      return next(errorHandler(400, "Invalid retry data"));
     }
 
-    const quiz = await Quiz.findById(quizId).populate("questions");
+    const quiz = await Quiz.findById(quizId);
     if (!quiz) {
-      next(errorHandler(404, "Quiz not found"));
+      return next(errorHandler(404, "Quiz not found"));
+    }
+
+    // Fetch all questions for this quiz
+    const questions = await Question.find({ _id: { $in: quiz.questions } });
+
+    if (questions.length !== answers.length) {
+      return next(
+        errorHandler(
+          400,
+          "Number of answers does not match number of questions"
+        )
+      );
     }
 
     const previousSubmission = await Submission.findOne({
       userId,
       quizId,
     }).sort({ completedDate: -1 });
+
     if (!previousSubmission) {
-      next(errorHandler(404, "No previous submission found for this quiz"));
+      return next(
+        errorHandler(404, "No previous submission found for this quiz")
+      );
     }
 
     const evaluation = await evaluateQuizAnswers(
-      quiz.questions,
+      questions,
       answers,
       quiz.maxScore
     );
@@ -228,7 +278,10 @@ export const retryQuiz = async (req, res, next) => {
     const newSubmission = new Submission({
       userId,
       quizId,
-      answers,
+      answers: answers.map((answer, index) => ({
+        questionIndex: index,
+        selectedAnswer: answer.selectedAnswer,
+      })),
       score: evaluation.score,
       feedback: evaluation.feedback,
       suggestionsToImprove: evaluation.suggestionsToImprove,
@@ -252,6 +305,43 @@ export const retryQuiz = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error retrying quiz:", error);
+    next(error);
+  }
+};
+
+export const getQuestionHint = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+
+    if (!questionId) {
+      return next(errorHandler(400, "Question ID is required"));
+    }
+
+    const question = await Question.findById(questionId);
+
+    if (!question) {
+      return next(errorHandler(404, "Question not found"));
+    }
+
+    if (!question.hint) {
+      // Generate a hint using AI if not already available
+      const prompt = `Generate a helpful hint for the following question without giving away the answer: "${question.text}"`;
+
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "mixtral-8x7b-32768",
+      });
+
+      question.hint = completion.choices[0].message.content;
+      await question.save();
+    }
+
+    res.status(200).json({
+      message: "Hint retrieved successfully",
+      hint: question.hint,
+    });
+  } catch (error) {
+    console.error("Error retrieving question hint:", error);
     next(error);
   }
 };
