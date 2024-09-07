@@ -1,0 +1,15 @@
+import express from 'express';
+import verifyUser from '../utils/verifyUser.js';
+import { generateQuiz, submitQuizAnswers, retryQuiz, getQuizHistory} from '../controllers/quiz.controller.js';
+
+
+const router = express.Router();
+
+
+// Quiz generation and submission
+router.post('/generate', verifyUser, generateQuiz);
+router.post('/submit', verifyUser, submitQuizAnswers);
+router.get('/history', verifyUser, getQuizHistory);
+router.post('/retry', verifyUser, retryQuiz);
+
+export default router;

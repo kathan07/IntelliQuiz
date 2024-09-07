@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cookieParser from 'cookie-parser'
 import auth from "./routes/auth.route.js";
 import connectDB from "./db/db.js";
+import quiz from "./routes/quiz.route.js";
 
 
 const app = express();
@@ -15,6 +16,8 @@ const port = process.env.PORT;
 
 connectDB();
 app.use("/auth",auth);
+app.use("/quiz", quiz);
+
 
 
 

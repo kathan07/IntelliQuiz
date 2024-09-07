@@ -3,16 +3,25 @@ import mongoose from "mongoose";
 // Quiz Schema
 const quizSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
-    gradeLevel: {
+    grade: {
       type: Number,
       required: true,
     },
     subject: {
       type: String,
+      required: true,
+    },
+    totalQuestions: {
+      type: Number,
+      required: true,
+    },
+    maxScore: {
+      type: Number,
+      required: true,
+    },
+    difficulty: {
+      type: String,
+      enum: ["EASY", "MEDIUM", "HARD"],
       required: true,
     },
     questions: [
