@@ -59,3 +59,7 @@ Once the application is up and running, you can access it at `http://localhost:3
 ## API Documentation
 
 For detailed information on the available API endpoints, refer to the [API Documentation](https://documenter.getpostman.com/view/27974052/2sAXjRWpde).
+
+## Hosted Base Endpoint
+
+`https://playpower-zjeu.onrender.com`
