@@ -6,6 +6,7 @@ import generateQuizQuestions from "../helpers/getQuiz.js";
 import evaluateQuizAnswers from "../helpers/evaluateQuiz.js";
 import getHint from "../helpers/getHint.js";
 import sendQuizResultEmail from "../facilites/nodemail.js";
+import { setCache, getCache } from "../facilites/redis.js";
 
 export const generateQuiz = async (req, res, next) => {
   try {
@@ -316,6 +317,52 @@ export const getQuestionHint = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error retrieving question hint:", error);
+    next(error);
+  }
+};
+
+export const getQuiz = async (req, res, next) => {
+  try {
+    const { quizId } = req.params;
+
+    // Try to get the quiz from cache
+    const cacheKey = `quiz:${quizId}`;
+    const cachedQuiz = await getCache(cacheKey);
+    if (cachedQuiz) {
+      return res.status(200).json({
+        message: "Quiz retrieved from cache",
+        quiz: cachedQuiz,
+      });
+    }
+
+    // If not in cache, fetch from database
+    const quiz = await Quiz.findById(quizId).populate("questions");
+    if (!quiz) {
+      next(errorHandler(404,"Quiz not found"));
+    }
+
+    const quizData = {
+      id: quiz._id,
+      grade: quiz.grade,
+      subject: quiz.subject,
+      totalQuestions: quiz.totalQuestions,
+      maxScore: quiz.maxScore,
+      difficulty: quiz.difficulty,
+      questions: quiz.questions.map((q) => ({
+        text: q.text,
+        options: q.options,
+      })),
+    };
+
+    // Cache the quiz data
+    await setCache(cacheKey, quizData, 3600); // Cache for 1 hour
+
+    res.status(200).json({
+      message: "Quiz retrieved successfully",
+      quiz: quizData,
+    });
+  } catch (error) {
+    console.error("Error retrieving quiz:", error);
     next(error);
   }
 };
