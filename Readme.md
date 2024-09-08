@@ -6,8 +6,6 @@ For fast quiz retrieval and caching, Redis is employed to ensure efficient perfo
 
 ## Features
 
-## Features of IntelliQuiz
-
 - **AI-Powered Quiz Generation**: Uses **GROQ** for generating quizzes tailored to user inputs, providing a dynamic and personalized quiz experience.
   
 - **Real-Time Quiz Evaluation**: Automatically evaluates submitted answers and provides instant feedback.
