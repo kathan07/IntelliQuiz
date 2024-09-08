@@ -7,7 +7,7 @@ const getHint = async (question) => {
     messages: [{ role: "user", content: prompt }],
     model: "mixtral-8x7b-32768",
   });
-  console.log(completion.choices[0].message.content);
+  // console.log(completion.choices[0].message.content);
   return completion.choices[0].message.content;
 };
 

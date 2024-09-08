@@ -6,7 +6,7 @@ import { generateQuiz, submitQuizAnswers, retryQuiz, getQuizHistory, getQuestion
 const router = express.Router();
 
 
-// Quiz generation and submission
+// Quiz routes
 router.post('/generate', verifyUser, generateQuiz);
 router.post('/submit', verifyUser, submitQuizAnswers);
 router.get('/history', verifyUser, getQuizHistory);
