@@ -2,66 +2,10 @@ import errorHandler from "../utils/error.js";
 import Quiz from "../models/quiz.model.js";
 import Question from "../models/question.model.js";
 import Submission from "../models/submission.model.js";
-import { Groq } from "groq-sdk";
-import dotenv from "dotenv";
-dotenv.config();
-// import nodemailer from "nodemailer";
-
-const groq = new Groq({ apiKey: process.env.API_KEY });
-
-const generateQuizQuestions = async (
-  subject,
-  grade,
-  totalQuestions,
-  difficulty
-) => {
-  const prompt = `Generate a quiz with ${totalQuestions} multiple-choice questions about ${subject} for grade ${grade} students. The difficulty level is ${difficulty}. For each question, provide the question text, 4 options, the correct answer, and a hint. Format the output as a JSON array. Make sure to keep key names as questionText for question, options for option, correctAnswer for correctAnswer and hint for hint. Dont give any questions that can't be parsed using JSON.parse function in javascript.`;
-
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: "user", content: prompt }],
-    model: "mixtral-8x7b-32768",
-  });
-  //   console.log(completion.choices[0].message.content);
-  return JSON.parse(completion.choices[0].message.content);
-};
-
-const evaluateQuizAnswers = async (questions, userAnswers, maxScore) => {
-  const questionsWithAnswers = questions.map((q, index) => ({
-    question: q.text,
-    correctAnswer: q.correctAnswer,
-    userAnswer: userAnswers[index].selectedAnswer,
-  }));
-
-  const prompt = `Evaluate the following quiz answers and provide a score out of ${maxScore}, along with feedback for each question and two suggestions to improve skills based on the responses. Format the output as JSON with keys: score (a number), feedback (an array of strings), and suggestionsToImprove (an array of strings). Ensure that feedback and suggestionsToImprove are arrays of strings and not objects.
-  
-    Quiz answers: ${JSON.stringify(questionsWithAnswers)}`;
-
-  try {
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "mixtral-8x7b-32768",
-    });
-
-    // console.log(completion.choices[0].message.content);
-
-    const parsedResponse = JSON.parse(completion.choices[0].message.content);
-
-    // Ensure feedback and suggestionsToImprove are arrays of strings
-    if (!Array.isArray(parsedResponse.feedback)) {
-      parsedResponse.feedback = [parsedResponse.feedback].filter(Boolean);
-    }
-    if (!Array.isArray(parsedResponse.suggestionsToImprove)) {
-      parsedResponse.suggestionsToImprove = [
-        parsedResponse.suggestionsToImprove,
-      ].filter(Boolean);
-    }
-
-    return parsedResponse;
-  } catch (error) {
-    console.error("Error evaluating quiz answers:", error);
-    throw new Error("Failed to evaluate quiz answers");
-  }
-};
+import generateQuizQuestions from "../helpers/getQuiz.js";
+import evaluateQuizAnswers from "../helpers/evaluateQuiz.js";
+import getHint from "../helpers/getHint.js";
+import sendQuizResultEmail from "../facilites/nodemail.js";
 
 export const generateQuiz = async (req, res, next) => {
   try {
@@ -124,9 +68,11 @@ export const generateQuiz = async (req, res, next) => {
 
 export const submitQuizAnswers = async (req, res, next) => {
   try {
-    const { quizId, userId, answers } = req.body;
+    const { quizId, answers } = req.body;
+    const user = req.user;
+    const userId = user._id;
 
-    if (!quizId || !userId || !answers || !Array.isArray(answers)) {
+    if (!quizId || !answers || !Array.isArray(answers)) {
       return next(errorHandler(400, "All fields are required"));
     }
 
@@ -167,6 +113,17 @@ export const submitQuizAnswers = async (req, res, next) => {
 
     await submission.save();
 
+    try {
+      await sendQuizResultEmail(user.email, {
+        score: evaluation.score,
+        maxScore: quiz.maxScore,
+        feedback: evaluation.feedback,
+        suggestionsToImprove: evaluation.suggestionsToImprove,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+
     res.status(200).json({
       message: "Quiz submitted and evaluated successfully",
       submission: {
@@ -184,25 +141,28 @@ export const submitQuizAnswers = async (req, res, next) => {
 
 export const getQuizHistory = async (req, res, next) => {
   try {
-    const { userId, grade, subject, minScore, maxScore, from, to } = req.query;
-
-    if (!userId) {
-      next(errorHandler(400, "User ID is required"));
-    }
+    const { grade, subject, minScore, maxScore, from, to } = req.query;
+    const userId = req.user.id;
 
     let query = { userId };
-
-    // Apply filters
-    if (grade) query["quiz.grade"] = parseInt(grade);
-    if (subject) query["quiz.subject"] = subject;
-    if (minScore) query.score = { $gte: parseInt(minScore) };
-    if (maxScore) query.score = { ...query.score, $lte: parseInt(maxScore) };
 
     // Date range filter
     if (from || to) {
       query.completedDate = {};
       if (from) query.completedDate.$gte = new Date(from);
-      if (to) query.completedDate.$lte = new Date(to);
+      if (to) {
+        // Set the 'to' date to the end of the day
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        query.completedDate.$lte = toDate;
+      }
+    }
+
+    // Score filter
+    if (minScore || maxScore) {
+      query.score = {};
+      if (minScore) query.score.$gte = parseInt(minScore);
+      if (maxScore) query.score.$lte = parseInt(maxScore);
     }
 
     const submissions = await Submission.find(query)
@@ -210,7 +170,14 @@ export const getQuizHistory = async (req, res, next) => {
       .sort({ completedDate: -1 })
       .lean();
 
-    const formattedSubmissions = submissions.map((sub) => ({
+    // Apply filters on populated quizId fields
+    const filteredSubmissions = submissions.filter((sub) => {
+      if (grade && sub.quizId.grade !== parseInt(grade)) return false;
+      if (subject && sub.quizId.subject !== subject) return false;
+      return true;
+    });
+
+    const formattedSubmissions = filteredSubmissions.map((sub) => ({
       id: sub._id,
       quizId: sub.quizId._id,
       grade: sub.quizId.grade,
@@ -235,12 +202,13 @@ export const getQuizHistory = async (req, res, next) => {
 
 export const retryQuiz = async (req, res, next) => {
   try {
-    const { userId, quizId, answers } = req.body;
+    const { quizId, answers } = req.body;
+    const user = req.user;
+    const userId = user._id;
 
-    if (!userId || !quizId || !answers || !Array.isArray(answers)) {
+    if (!quizId || !answers || !Array.isArray(answers)) {
       return next(errorHandler(400, "Invalid retry data"));
     }
-
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
       return next(errorHandler(404, "Quiz not found"));
@@ -291,6 +259,19 @@ export const retryQuiz = async (req, res, next) => {
 
     await newSubmission.save();
 
+    try {
+      await sendQuizResultEmail(user.email, {
+        score: evaluation.score,
+        maxScore: quiz.maxScore,
+        feedback: evaluation.feedback,
+        suggestionsToImprove: evaluation.suggestionsToImprove,
+        isRetry: true,
+        previousScore: previousSubmission.score,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+
     res.status(200).json({
       message: "Quiz retried and evaluated successfully",
       submission: {
@@ -324,15 +305,8 @@ export const getQuestionHint = async (req, res, next) => {
     }
 
     if (!question.hint) {
-      // Generate a hint using AI if not already available
-      const prompt = `Generate a helpful hint for the following question without giving away the answer: "${question.text}"`;
-
-      const completion = await groq.chat.completions.create({
-        messages: [{ role: "user", content: prompt }],
-        model: "mixtral-8x7b-32768",
-      });
-
-      question.hint = completion.choices[0].message.content;
+      const reply = await getHint(question);
+      question.hint = reply;
       await question.save();
     }
 

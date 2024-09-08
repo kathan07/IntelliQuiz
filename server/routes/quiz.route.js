@@ -11,6 +11,6 @@ router.post('/generate', verifyUser, generateQuiz);
 router.post('/submit', verifyUser, submitQuizAnswers);
 router.get('/history', verifyUser, getQuizHistory);
 router.post('/retry', verifyUser, retryQuiz);
-router.get('/hint/:questionId', getQuestionHint);
+router.get('/hint/:questionId',verifyUser, getQuestionHint);
 
 export default router;
