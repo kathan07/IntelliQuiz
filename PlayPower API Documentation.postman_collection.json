@@ -1,0 +1,273 @@
+{
+	"info": {
+		"_postman_id": "dd35f3b0-7299-4349-9862-cc360efccae1",
+		"name": "PlayPower API Documentation",
+		"description": "Base URL: `https://playpower-zjeu.onrender.com`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "27974052"
+	},
+	"item": [
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"username\": \"kathan07\",\r\n  \"email\": \"kathanythakkar07@gmail.com\",\r\n  \"password\": \"securePassword123\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/auth/register",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"auth",
+						"register"
+					]
+				},
+				"description": "This endpoint allows new users to create an account on the PlayPower platform.\n\n- `username`: A unique username for the account\n    \n- `email`: A valid email address\n    \n- `password`: A secure password for the account\n    \n- **Success Response:**\n    \n    - Code: 201 CREATED\n        \n    - Content: { message: \"User registered successfully\" }\n        \n- **Error Response:**\n    \n    - Code: 400 BAD REQUEST\n        \n    - Content: { error: \"Username already exists\" }\n        \n    - OR\n        \n    - Code: 400 BAD REQUEST\n        \n    - Content: { error: \"Email already in use\" }"
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\": \"kathanythakkar07@gmail.com\",\r\n    \"password\": \"securePassword123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/auth/login",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"auth",
+						"login"
+					]
+				},
+				"description": "This endpoint authenticates a user and provides a token for subsequent API calls.\n\n- `email`: The registered email address\n    \n- `password`: The account password\n    \n\n**Success Response:**\n\n- Code: 200 OK\n    \n- \"user\": { \"id\": \"user_id_here\", \"username\": \"kathan07\", \"email\": \"[kathanythakkar07@gmail.com](https://mailto:kathanythakkar07@gmail.com)\", // Other user information fields }}\n    \n- Cookies: The response will set session cookies in the browser. These cookies should be included automatically in subsequent requests to authenticated endpoints.\n    \n\n**Error Response:**\n\n- Code: 401 UNAUTHORIZED\n    \n- Content: { error: \"Invalid credentials\" }"
+			},
+			"response": []
+		},
+		{
+			"name": "Logout",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/auth/logout",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"auth",
+						"logout"
+					]
+				},
+				"description": "This endpoint logs out the currently authenticated user, invalidating their session token and clearing session cookies.\n\n**Success Response:**\n\n- Code: 200 OK\n    \n- Content: { message: \"Logged out successfully\" }\n    \n- Cookies: The response will clear the session cookies set during login."
+			},
+			"response": []
+		},
+		{
+			"name": "generateQuiz",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"grade\": 11,\r\n  \"Subject\": \"Maths\",\r\n  \"TotalQuestions\": 1,\r\n  \"MaxScore\": 10,\r\n  \"Difficulty\": \"Hard\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/generate",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"generate"
+					]
+				},
+				"description": "This endpoint generates a new quiz based on the provided parameters such as grade level, subject, and difficulty.\n\n- `grade`: The grade level for the quiz (e.g., 11)\n    \n- `Subject`: The subject of the quiz (e.g., \"Maths\")\n    \n- `TotalQuestions`: The number of questions in the quiz\n    \n- `MaxScore`: The maximum score possible for the quiz\n    \n- `Difficulty`: The difficulty level of the quiz (e.g., \"Easy\", \"Medium\", \"Hard\")\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: { quizId: \"QUIZ_ID\", questions: \\[...\\] }\n        \n- **Error Response:**\n    \n    - Code: 400 BAD REQUEST\n        \n    - Content: { error: \"Invalid parameters\" }\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		},
+		{
+			"name": "submitQuiz",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"quizId\": \"66dc7bdb9b6653b748bc51bd\",\r\n  \"answers\": [\r\n    {\r\n      \"selectedAnswer\": \"-13\"\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/submit",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"submit"
+					]
+				},
+				"description": "This endpoint allows users to submit their answers for a quiz.\n\n- `quizId`: The ID of the quiz being submitted\n    \n- `answers`: An array of selected answers for each question\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: { score: number, feedback: \\[...\\] }\n        \n- **Error Response:**\n    \n    - Code: 400 BAD REQUEST\n        \n    - Content: { error: \"Invalid quiz ID\" }\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		},
+		{
+			"name": "quizHistory",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/history?grade=11",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"history"
+					],
+					"query": [
+						{
+							"key": "grade",
+							"value": "11"
+						}
+					]
+				},
+				"description": "This endpoint retrieves the quiz history for a specific grade level.\n\n- **Query Parameters:**\n    \n    - `grade`: number (The grade level to retrieve history for)\n        \n- **Example:** `/quiz/history?grade=11`\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: `{ \"quizzes\": [...] }`\n        \n- **Error Response:**\n    \n    - Code: 400 BAD REQUEST\n        \n    - Content: `{ \"error\": \"Invalid value\" }`\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		},
+		{
+			"name": "RetryQuiz",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"quizId\": \"66dc7bdb9b6653b748bc51bd\",\r\n  \"answers\": [\r\n    {\r\n      \"selectedAnswer\": \"-11\"\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/retry",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"retry"
+					]
+				},
+				"description": "This endpoint allows users to retry a previously taken quiz with new answers.\n\n- `quizId`: The ID of the quiz being retried\n    \n- `answers`: An array of new selected answers for each question\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: `{ \"score\": number, \"feedback\": [...] }`\n        \n- **Error Response:**\n    \n    - Code: 400 BAD REQUEST\n        \n    - Content: `{ \"error\": \"Invalid quiz ID\" }`\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		},
+		{
+			"name": "GetHint",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/hint/66dc7bdb9b6653b748bc51be",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"hint",
+						"66dc7bdb9b6653b748bc51be"
+					]
+				},
+				"description": "- This endpoint provides a hint for a specific question in a quiz.\n    \n- **Parameters:**\n    \n    - `questionId`: The ID of the question to get a hint for\n        \n- **Example:** `/quiz/hint/66dc7bdb9b6653b748bc51be`\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: `{ \"hint\": \"string\" }`\n        \n- **Error Response:**\n    \n    - Code: 404 NOT FOUND\n        \n    - Content: `{ \"error\": \"Question not found\" }`\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		},
+		{
+			"name": "getQuiz",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://playpower-zjeu.onrender.com/quiz/66ddbf613abe7a8668e7ffa5",
+					"protocol": "https",
+					"host": [
+						"playpower-zjeu",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"quiz",
+						"66ddbf613abe7a8668e7ffa5"
+					]
+				},
+				"description": "- This endpoint retrieves the details of a specific quiz, including questions and correct answers if the quiz has been completed.\n    \n- **Parameters:**\n    \n    - `quizId`: The ID of the quiz to retrieve\n        \n- **Example:** `/quiz/66ddbf613abe7a8668e7ffa5`\n    \n- **Success Response:**\n    \n    - Code: 200 OK\n        \n    - Content: `{ \"quizDetails\": {...}, \"questions\": [...] }`\n        \n- **Error Response:**\n    \n    - Code: 404 NOT FOUND\n        \n    - Content: `{ \"error\": \"Quiz not found\" }`\n        \n\n**Note:** This endpoint requires authentication. Ensure that your session cookies are included with the request."
+			},
+			"response": []
+		}
+	]
+}
